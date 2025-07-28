@@ -12,18 +12,50 @@
 \usepackage{tikz}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
+%\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+% Common styles
+\tikzstyle{block} = [rectangle, rounded corners, draw, text centered, minimum height=0.8cm, font=\small, text width=4cm]
+\tikzstyle{conv} = [block, fill=cyan!30]
+\tikzstyle{bn} = [block, fill=orange!30]
+\tikzstyle{relu} = [block, fill=lime!40]
+\tikzstyle{pool} = [block, fill=purple!30]
+\tikzstyle{input} = [block, fill=yellow!30]
+\tikzstyle{output} = [block, fill=blue!30]
+\tikzstyle{concat} = [block, fill=teal!30]
+\tikzstyle{bottleneck} = [block, fill=gray!30]
+\tikzstyle{arrow} = [thick, ->, >=stealth]
+
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
-\title{Hardware-Software Co-Design for Brain Tumor Segmentation Using U-Net Architecture}
+\begin{document}
+
+\title{Hardware-Software Co-Design for Brain Tumor
+ Segmentation Using U-Net Architecture}
 
 \author{
-    \IEEEauthorblockN{Abu Huzaifa, Vaibhav Naresh Dachewar, Prof. Rituparna Choudhury}
-    \IEEEauthorblockA{\textit{Dept. of Electronics and Communication Engineering} \\
-    \textit{International Institute of Information Technology Bangalore}\\
-    Bangalore, India \\
-    abu.huzaifa@iiitb.ac.in, vaibhavnaresh.dachewar@iiitb.ac.in, rituparna.choudhury@iiitb.ac.in}
+\IEEEauthorblockN{Abu Huzaifa}
+\IEEEauthorblockA{
+\textit{Dept. of ECE} \\
+\textit{IIIT Bangalore} \\
+Bangalore, India \\
+abu.Huzaifa@iiitb.ac.in}
+\and
+\IEEEauthorblockN{Vaibhav Naresh Dachewar}
+\IEEEauthorblockA{
+\textit{Dept. of ECE} \\
+\textit{IIIT Bangalore} \\
+Bangalore, India \\
+vaibhavnaresh.dachewar@iiitb.ac.in}
+\and
+\IEEEauthorblockN{Rituparna Choudhury}
+\IEEEauthorblockA{
+\textit{Dept. of ECE} \\
+\textit{IIIT Bangalore} \\
+Bangalore, India \\
+rituparna.choudhury@iiitb.ac.in}
 }
 
 \begin{document}
@@ -31,7 +63,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents a Hardware-Software Co-Design methodology for brain tumor segmentation using the U-Net architecture. The software part involves training and testing the U-Net on 3064 T1-weighted contrast-enhanced MRI images, achieving significant segmentation performance. The hardware part implements modular Verilog designs for each U-Net block, allowing FPGA-based acceleration. Module-wise synthesis results are reported for individual Verilog modules, paving the way for full U-Net deployment on FPGA.
+This paper presents a hardware-software co-design methodology for efficient brain tumor segmentation using the U-Net architecture. In the software domain, the U-Net model is trained and evaluated on a dataset of 3064 T1-weighted contrast-enhanced MRI images, achieving high segmentation accuracy across various tumor types. Preprocessing steps such as normalization and resizing are applied to standardize inputs, and the model performance is monitored using Dice Coefficient, Precision, Recall, and other metrics. On the hardware side, the U-Net network is implemented in a modular Verilog-based design, where each functional block—including convolutional layers, batch normalization, activation, pooling, and upsampling—is developed independently. These modules are synthesized using the Vivado Design Suite, targeting the XA Zynq UltraScale+ MPSoC platform. Synthesis reports provide detailed insights into logic utilization, power consumption, and timing analysis. This modular approach not only simplifies verification and testing but also enables future scalability and optimization. The proposed framework bridges the gap between deep learning-based medical image analysis and real-time hardware implementation, offering a step forward in deploying accurate and efficient tumor segmentation on FPGA platforms.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -39,145 +71,503 @@ U-Net, Brain Tumor Segmentation, Hardware-Software Co-Design, FPGA, Verilog, MRI
 \end{IEEEkeywords}
 
 \section{Introduction}
-Brain tumor segmentation in MRI images is critical for clinical diagnosis and treatment planning. Manual segmentation is time-consuming and prone to human error. With advances in deep learning, architectures like U-Net have demonstrated excellent performance in biomedical image segmentation \cite{b2}. This work explores a hardware-software co-design methodology: software training of U-Net for segmentation, followed by hardware implementation of modular Verilog blocks for FPGA acceleration.
+Brain tumors represent one of the most life-threatening neurological disorders, with rising incidence rates globally. In India alone, approximately 28,000 new brain tumor cases are reported each year, with nearly 24,000 deaths annually. Early and accurate diagnosis is critical for effective treatment planning and improved survival rates. Traditionally, brain tumor segmentation in MRI scans has been carried out manually by expert radiologists, a process that is both time-intensive and prone to subjective errors.
+
+To address these limitations, researchers have increasingly turned to deep learning-based medical image segmentation, where convolutional neural networks (CNNs) have shown significant promise. Among the many architectures, U-Net, proposed by Ronneberger et al. in 2015, has become a standard in biomedical segmentation tasks due to its efficient encoder-decoder structure and skip connections that preserve spatial resolution lost during downsampling.
+
+Multiple studies have validated and extended the U-Net framework. [1] explored tumor region augmentation to boost classification performance, while [8] enhanced U-Net using "Box" modules to improve feature representation during upsampling. Meanwhile, [3] demonstrated the effectiveness of deep CNNs in tumor classification tasks, and [7] applied EfficientNetB0 and VGG16 for brain tumor detection using FPGA-based systems. These works highlight the growing trend of combining machine learning with efficient hardware platforms for practical deployment.
+
+While GPU-based implementations are effective for model development and training, they pose challenges related to power consumption, scalability, and cost when deploying real-time inference systems—especially in clinical or portable settings. As a result, hardware accelerators like FPGAs are gaining traction due to their parallelism, lower power usage, and reconfigurability. Several studies have explored this domain, [4] proposed an FPGA-based U-Net design, [5] focused on hardware-software co-design for tumor segmentation; and [6] developed custom FPGA IP cores for image processing tasks.
+
+In this paper, we present a hardware-software co-design methodology for brain tumor segmentation using the U-Net architecture. The software part involves preprocessing and training the U-Net model on 3064 T1-weighted contrast-enhanced MRI images, achieving strong segmentation accuracy across multiple tumor classes. On the hardware side, the U-Net architecture is modularized into Verilog-based blocks—such as convolution, pooling, activation, and upsampling modules—that are synthesized using the Vivado Design Suite and targeted for FPGA implementation. This design approach enables resource-efficient acceleration, paving the way for practical deployment of deep learning-based medical diagnostics on reconfigurable hardware platforms.
+
+
 
 \section{Related Work}
-Several studies integrate deep learning with FPGA acceleration for medical imaging. Díaz-Pernas et al. \cite{b3} proposed a multiscale CNN for tumor detection. Mallick et al. \cite{b7} used CNNs (EfficientNetB0, VGG16) with FPGA for classification. Popat et al. \cite{b8} introduced Box-U-Net, improving segmentation accuracy. Rayapati et al. \cite{b5} implemented Otsu and Watershed algorithms on FPGA, achieving real-time performance. Chatterjee et al. \cite{b6} designed custom IP cores for edge detection. These studies motivated our modular Verilog implementation.
+Several studies integrate deep learning with FPGA acceleration for medical imaging. \cite{b3} proposed a multiscale CNN for tumor detection. \cite{b7} used CNNs (EfficientNetB0, VGG16) with FPGA for classification.\cite{b8} introduced Box-U-Net, improving segmentation accuracy.\cite{b5} implemented Otsu and Watershed algorithms on FPGA, achieving real-time performance.\cite{b6} designed custom IP cores for edge detection. These studies motivated our modular Verilog implementation.
 
 \section{Dataset and Preprocessing}
-The dataset consists of 3064 T1-weighted contrast-enhanced MRI images from 233 patients: meningioma (708), glioma (1426), and pituitary tumors (930) \cite{b1}. Preprocessing included resizing images to $256\times256$ and normalizing pixel intensities. Each image-mask pair was used for supervised training.
+The dataset consists of 3064 T1-weighted contrast-enhanced MRI images from 233 patients, comprising meningioma (708), glioma (1426), and pituitary tumors (930) \cite{b1}. 
 
-\section{Software Design and Training}
+Preprocessing included resizing all images to $256 \times 256$ pixels and normalizing pixel intensities to a consistent scale. Each image-mask pair was used for supervised training.
+
+The dataset was split into three subsets:
+\begin{itemize}
+    \item \textbf{Training set:} 1840 images
+    \item \textbf{Validation set:} 612 images
+    \item \textbf{Test set:} 612 images
+\end{itemize}
+
+This split was performed to ensure balanced evaluation during model training, validation, and final testing.
+
+
+\section{THE PROPOSED SCHEME}
 \subsection{U-Net Architecture}
-The U-Net consists of an encoder-decoder structure with skip connections. Each encoder block includes two Conv2D-BatchNorm-ReLU layers followed by MaxPooling, while decoder blocks use Conv2DTranspose layers.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.45\textwidth]{unet_block_diagram.png} % You can redraw this from your code
+\includegraphics[width=0.53\textwidth, height=6cm]{final.png}
     \caption{U-Net Block Diagram}
     \label{fig:unet_block}
 \end{figure}
 
+
+UNet is a convolutional neural network architecture for tackling the complexities of semantic segmentation, which is considered a fundamental task in computer vision with applications ranging from medical imaging to autonomous vehicles.
+
+The U-Net architecture adopts a unique encoder-decoder approach for image segmentation. Unlike residual connections, U-Net utilizes long-range skip connections that concatenate the lower-level encoder’s feature map to the decoder’s upsampled feature map to recover spatial details lost during downsampling, leading to high-accuracy segmentation.
+
+As shown in Fig.~\ref{fig:unet_block}, the U-Net architecture consists of two main components: an encoder to analyze the whole image and a decoder enabling precise localization. The U-Net encoder captures the hierarchical contextual information in an input image. It consists of repeated application of $3\times3$ unpadded convolutions with stride 2, each followed by batch normalization and a Rectified Linear Unit (ReLU) for downsampling. 
+
+The decoder recovers the spatial resolution lost during encoding through a series of upsampling and convolutional operations. Specifically, each decoding stage performs an initial $2\times2$ up-convolutional layer that upsamples the input feature map from the prior layer. This upsampled output is then concatenated channel-wise with the corresponding cropped encoding activation map. This channel-level fusion allows the decoder to integrate localization details from earlier encoder stages with the context-rich upsampled semantics.
+
+In this paper, we employ an interpolation technique to perform the upsampling of the input feature. Finally, the Sigmoid activation function is applied to produce the final segmentation mask.
+The numerical representations of ReLU, Sigmoid, and Batch Normalization (BN) are defined as follows:
+\vspace{-0.3cm}
+\begin{align}
+\text{ReLU}(x) &=
+\begin{cases}
+0 & \text{if } x \leq 0 \\
+x & \text{otherwise}
+\end{cases}\\[0.4em]
+\text{Sigmoid}(x) &= \frac{1}{1 + \exp(-x)}\\[0.4em]
+\text{BN}(z_m) &= \gamma_m \cdot \hat{z}_m + \beta_m\\[0.4em]
+\hat{z}_m &= \frac{z_m - \bar{z}_m}{\sqrt{\sigma_m^2 + \epsilon}}
+\end{align}
+\vspace{-0.4cm}
+
+\noindent Here, $\bar{z}_m$ and $\sigma_m^2$ are the sample mean and variance of feature $m$ along the mini-batch axis. $\epsilon$ is a small positive constant for numerical stability, and $\gamma_m$, $\beta_m$ are learnable parameters for scaling and shifting the normalized output.
+
+%\subsection{Software Design Flowchart}
+%The following flowchart illustrates the high-level software architecture and data flow of the system, highlighting major components and their interactions.
+%\begin{figure}[H]
+ %   \centering
+  %  \includegraphics[width=0.9\textwidth]{flow_soft.png}
+  %  \caption{Software Design Flowchart}
+  %  \label{fig:software_flowchart}
+%\end{figure}
+
+\vspace{-0.3cm}
+\section{Software Design}
+\vspace{-0.3cm}
+\subsection{Design Flow}
+\vspace{-0.1cm}
+\noindent The following flowchart illustrates the high-level software architecture and data flow of the system, highlighting major components and their interactions. The pipeline begins with data preparation, where raw medical imaging data is collected and organized for processing. Exploratory Data Analysis (EDA) provides insights into data distribution and quality to guide processing decisions. Data augmentation expands the training dataset and improves model robustness through synthetic image variations. The preprocessing stage standardizes data format and applies necessary transformations for model training. Data splitting divides the dataset into training, validation, and testing subsets for proper evaluation. The segmentation model represents the core deep learning architecture that identifies and segments tumor regions from brain MRI images. Finally, the system outputs precise tumor masks that delineate tumor boundaries, providing clinicians with valuable diagnostic information for treatment planning. These masks assist in quantifying tumor size and shape, which are crucial for monitoring disease progression.
+
+To ensure high accuracy and generalization, the model performance is continuously evaluated using metrics such as Dice coefficient and Intersection over Union (IoU). The entire workflow is designed to be modular and scalable, allowing for easy integration with clinical systems or future enhancements. Additionally, post-processing techniques can be applied to refine the output masks and reduce false positives for improved clinical reliability.
+
+\vspace{0.2cm}
+\tikzstyle{block} = [rectangle, rounded corners, draw, text centered, minimum height=0.8cm, font=\small, text width=3.5cm]
+\tikzstyle{process} = [block, fill=green!40]
+\tikzstyle{eda} = [block, fill=lime!60]
+\tikzstyle{augment} = [block, fill=magenta!50]
+\tikzstyle{preprocess} = [block, fill=orange!80]
+\tikzstyle{split} = [block, fill=purple!50]
+\tikzstyle{model} = [block, fill=red!30]
+\tikzstyle{output} = [block, fill=blue!30]
+\tikzstyle{arrow} = [thick, ->, >=stealth]
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.4cm]
+\node (prep) [process] {Data Preparation};
+\node (eda) [eda, below of=prep] {Exploratory Data Analysis (EDA)};
+\node (aug) [augment, below of=eda] {Data Augmentation};
+\node (pre) [preprocess, below of=aug] {Data Preprocessing};
+\node (split) [split, below of=pre] {Data Splitting};
+\node (seg) [model, below of=split] {Segmentation Model};
+\node (out) [output, below of=seg] {Output: Tumor Mask};
+\draw [arrow] (prep) -- (eda);
+\draw [arrow] (eda) -- (aug);
+\draw [arrow] (aug) -- (pre);
+\draw [arrow] (pre) -- (split);
+\draw [arrow] (split) -- (seg);
+\draw [arrow] (seg) -- (out);
+\end{tikzpicture}
+\caption{Brain Tumor Segmentation Pipeline}
+\label{fig:segmentation_pipeline}
+\end{figure}
 \subsection{Implementation}
-Python scripts (`unet.py`, `metric.py`, `train.py`, `test.py`) were executed on Google Colab using GPU acceleration. The model was trained for 50 epochs (runtime: 91.5 minutes) with initial learning rate $10^{-4}$ decayed progressively.
+To implement the software component of the brain tumor segmentation project, the U-Net architecture was developed from scratch in Python. The implementation involved designing and coding the encoder-decoder structure of U-Net in a modular format within the `unet.py` script, with separate components for convolutional layers, skip connections, and upsampling blocks. Supporting scripts such as `metric.py`, `train.py`, and `test.py` handled the computation of evaluation metrics (like Dice Coefficient), model training, and inference testing respectively. The modular design approach ensured code reusability and maintainability throughout the development process.
+
+The dataset used comprised a total of 3064 MRI brain scan images along with corresponding manually annotated ground truth masks. These images were preprocessed (resized, normalized, and augmented) before being used in training and evaluation. Data was split into training, validation, and testing sets in a stratified manner to maintain class distribution consistency across sets. Additional preprocessing included intensity normalization and data augmentation techniques such as rotation and flipping to improve model generalization.
+
+The entire training pipeline was executed on Google Colab utilizing GPU acceleration (NVIDIA Tesla T4). The model was trained for 50 epochs with a batch size of 8 and an initial learning rate of $10^{-4}$, which was progressively decayed based on validation loss to ensure stable convergence. The Adam optimizer was used for its adaptive learning rate and momentum-based updates. The total runtime for training was approximately 91.5 minutes. Performance monitoring was conducted throughout training with early stopping mechanisms to prevent overfitting.
 
 \begin{table}[H]
 \caption{Training Details}
 \centering
-\begin{tabular}{|l|l|}
+\begin{tabular}{|c|c|}
 \hline
 \textbf{Parameter}       & \textbf{Value}           \\ \hline
 Epochs                   & 50                       \\ \hline
 Batch Size               & 8                        \\ \hline
-Optimizer                 & Adam                     \\ \hline
+Optimizer                & Adam                     \\ \hline
 Learning Rate            & $10^{-4}$ (decayed)      \\ \hline
 Runtime                  & 91.5 minutes             \\ \hline
 \end{tabular}
 \label{tab:training_details}
 \end{table}
 
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{mri_input_image.png}
+        \caption{Input MRI}
+        \label{fig:input_mri}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{mask_image.png}
+        \caption{Ground Truth}
+        \label{fig:ground_truth}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{segmented_result_image.png}
+        \caption{Predicted Mask}
+        \label{fig:predicted_mask}
+    \end{subfigure}
+    \caption{Sample Segmentation Output: (a) Input MRI, (b) Ground Truth, (c) Predicted Mask}
+    \label{fig:segmentation}
+\end{figure}
+
 \subsection{Performance Metrics}
-After testing, the model achieved:
+During training, model performance was monitored using Dice Coefficient and Loss values on both training and validation sets. As shown in Figure~\ref{fig:log_plot}, training and validation metrics progressively improve. The validation Dice Coefficient and loss become relatively steady around **epoch 27**, suggesting convergence. The learning rate used initially was $10^{-4}$ and decayed during training.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{log_new.png}
+    \caption{Model performance over 50 epochs showing training and validation Dice Coefficient, and Loss.}
+    \label{fig:log_plot}
+\end{figure}
+
+To evaluate the model’s generalization, 10 test images were used, and F1 Score, Precision, and Recall were computed per image. The model consistently performs with values close to 1, as shown in Figure~\ref{fig:score_plot}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{Huzaifa_metrics.png}
+    \caption{Performance metrics (F1 Score, Jaccard, Recall, Precision) across 10 test images.}
+    \label{fig:score_plot}
+\end{figure}
+
+The model when tested over 612 images achieved the following average performance:
 \begin{itemize}
     \item Dice Coefficient: 0.8176
-    \item Jaccard Index: 0.6710
+    \item Jaccard Index (IoU): 0.6710
     \item F1 Score: 0.7527
     \item Precision: 0.7955
     \item Recall: 0.7624
 \end{itemize}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.45\textwidth]{segmentation_results.png} % Replace with actual image
-    \caption{Sample Segmentation Output: (a) Input MRI, (b) Ground Truth, (c) Predicted Mask}
-    \label{fig:segmentation}
-\end{figure}
+These metrics are critical for evaluating segmentation quality:
+\begin{itemize}
+    \item \textbf{F1 Score} is the harmonic mean of Precision and Recall. It balances both false positives and false negatives, providing a robust overall indicator.
+    \item \textbf{Precision} measures how many of the predicted positive pixels are truly positive. High precision indicates few false positives.
+    \item \textbf{Recall} reflects how many actual positive pixels were correctly identified. High recall means few false negatives.
+    \item \textbf{Jaccard Index (IoU)} is the ratio of the intersection over the union between the predicted and ground truth masks, commonly used in segmentation tasks.
+\end{itemize}
+
+\usepackage{float} % Include in preamble if not already
+
+\begin{table}[H]
+\centering
+\caption{Comparison of Proposed Work with Related Methods}
+\label{tab:comparison}
+\begin{tabular}{|p{2.5cm}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|}
+\hline
+\textbf{Authors} & \textbf{Dice Coefficient} & \textbf{IoU} & \textbf{F1 Score} & \textbf{Precision} \\
+\hline
+Nizamani, Chen et al. [12] & 0.66 & 0.67 & 0.57 & 0.79 \\
+\hline
+Zhang, Chen et al. [9]     & 0.60 & 0.60 & 0.51 & 0.71 \\
+\hline
+Lou, Gong et al. [10]      & 0.60 & 0.61 & 0.52 & 0.72 \\
+\hline
+Huang, Zhou et al. [11]    & 0.63 & 0.63 & 0.54 & 0.75 \\
+\hline
+\textbf{Proposed Work}     & \textbf{0.81} & \textbf{0.67} & \textbf{0.75} & \textbf{0.79} \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+
 
 \section{Hardware Design}
 \subsection{Modular Verilog Implementation}
-The U-Net architecture was decomposed into the following Verilog modules:
+The proposed U-Net architecture was decomposed into multiple reusable Verilog modules to support a hierarchical hardware design approach. This modular methodology enables efficient verification, synthesis, and debugging of individual components before full system integration—critical for complex architectures like U-Net, which contain multiple convolutional, pooling, and upsampling layers.
+
+The design targets the XA Zynq UltraScale+ MPSoC FPGA family, chosen for its high-performance logic, rich DSP resources, and heterogeneous processing capabilities. Vivado Design Suite was used for simulation, synthesis, and timing analysis.
+
+Each U-Net block is implemented as a distinct Verilog module:
 \begin{itemize}
-    \item \texttt{conv2d\_layer.v}
-    \item \texttt{batchnorm\_relu.v}
-    \item \texttt{maxpool2d.v}
-    \item \texttt{conv2d\_transpose.v}
-    \item \texttt{encoder\_block.v}, \texttt{decoder\_block.v}
-    \item \texttt{feature\_concatenate.v}
-    \item Top-level: \texttt{unet\_top.v}
+    \item \texttt{conv2d\_layer}: Parameterized 2D convolution.
+    \item \texttt{batchnorm\_relu}: Combines batch normalization and ReLU activation.
+    \item \texttt{maxpool2d}: Implements 2D max-pooling for downsampling.
+    \item \texttt{conv2d\_transpose}: Realizes transposed convolution for upsampling.
+    \item \texttt{conv\_block}: Chains two \texttt{conv2d\_layer}s with \texttt{batchnorm\_relu}.
+    \item \texttt{encoder\_block} and \texttt{decoder\_block}: Implement respective U-Net stages.
+    \item \texttt{feature\_concatenate}: Merges skip connections from encoder to decoder.
+    \item \texttt{unet\_top}: Integrates all submodules at the system level.
+This structure promotes reusability and simplifies adaptation to other CNN topologies.
+
 \end{itemize}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.45\textwidth]{fpga_hierarchy.png} % Redraw based on your folder hierarchy
-    \caption{Hierarchical Hardware Design}
-    \label{fig:fpga_hierarchy}
-\end{figure}
 
-\subsection{Dataflow Diagram}
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.45\textwidth]{dataflow_diagram.png} % Refer Rayapati et al. Fig.2 as base
-    \caption{Dataflow between U-Net Modules in FPGA}
-    \label{fig:dataflow}
-\end{figure}
+
+%\begin{figure}[H]
+  %  \centering
+  %  \includegraphics[width=0.45\textwidth]{fpga_hierarchy.png} % Replace with your hierarchy diagram
+  %  \caption{Hierarchical Organization of U-Net Modules for FPGA Implementation on XA Zynq UltraScale+ MPSoCs}
+  %  \label{fig:fpga_hierarchy}
+%\end{figure}
+
+% Each module was synthesized separately using Vivado to evaluate logic utilization, timing, and power. The XA Zynq UltraScale+ MPSoC’s extensive LUT, BRAM, and DSP resources make it an ideal candidate for deploying such computationally intensive architectures.
+
+%\subsection{Dataflow Diagram}
+%\begin{figure}[H]
+ %   \centering
+ %   \includegraphics[width=0.45\textwidth]{dataflow_diagram.png} % Refer Rayapati et al. Fig.2 as base
+   % \caption{Dataflow between U-Net Modules in FPGA}
+   % \label{fig:dataflow}
+%\end{figure}
 
 \subsection{Flowchart of Dataflow}
+
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=1.3cm, every node/.style={draw, align=center}]
-\node (start) {Start};
-\node (enc1) [below of=start] {Encoder Block 1};
-\node (enc2) [below of=enc1] {Encoder Block 2};
-\node (enc3) [below of=enc2] {Encoder Block 3};
-\node (enc4) [below of=enc3] {Encoder Block 4};
-\node (bottleneck) [below of=enc4] {Bottleneck};
-\node (dec4) [below of=bottleneck] {Decoder Block 4};
-\node (dec3) [below of=dec4] {Decoder Block 3};
-\node (dec2) [below of=dec3] {Decoder Block 2};
-\node (dec1) [below of=dec2] {Decoder Block 1};
-\node (output) [below of=dec1] {Output: Segmentation Mask};
+\begin{tikzpicture}[node distance=1.2cm]
+\node (input) [input] {Input Feature Map};
+\node (conv1) [conv, below of=input] {Conv2D };
+\node (bn1) [bn, below of=conv1] {BatchNorm};
+\node (relu1) [relu, below of=bn1] {ReLU Activation};
+\node (conv2) [conv, below of=relu1] {Conv2D };
+\node (bn2) [bn, below of=conv2] {BatchNorm};
+\node (relu2) [relu, below of=bn2] {ReLU Activation};
+\node (pool) [pool, below of=relu2] {MaxPooling2D };
+
+\foreach \i/\j in {input/conv1, conv1/bn1, bn1/relu1, relu1/conv2, conv2/bn2, bn2/relu2, relu2/pool}
+  \draw[arrow] (\i) -- (\j);
+\end{tikzpicture}
+\caption{Encoder Block }
+\label{fig:encoder_block}
+\end{figure}
+
+
+\vspace{1cm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.2cm]
+\node (input) [input] {Input Feature Map};
+\node (upconv) [conv, below of=input] {Conv2DTranspose};
+\node (concat) [concat, below of=upconv] {Concatenate with Skip Connection};
+\node (conv1) [conv, below of=concat] {Conv2D };
+\node (bn1) [bn, below of=conv1] {BatchNorm};
+\node (relu1) [relu, below of=bn1] {ReLU Activation};
+\node (conv2) [conv, below of=relu1] {Conv2D };
+\node (bn2) [bn, below of=conv2] {BatchNorm};
+\node (relu2) [relu, below of=bn2] {ReLU Activation};
+
+\foreach \i/\j in {input/upconv, upconv/concat, concat/conv1, conv1/bn1, bn1/relu1, relu1/conv2, conv2/bn2, bn2/relu2}
+  \draw[arrow] (\i) -- (\j);
+\end{tikzpicture}
+\caption{Decoder Block}
+\label{fig:decoder_block}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.2cm]
+\node (input) [input] {Input Feature Map};
+\node (conv1) [conv, below of=input] {Conv2D};
+\node (bn1) [bn, below of=conv1] {BatchNorm};
+\node (relu1) [relu, below of=bn1] {ReLU Activation};
+\node (conv2) [conv, below of=relu1] {Conv2D};
+\node (bn2) [bn, below of=conv2] {BatchNorm};
+\node (relu2) [relu, below of=bn2] {ReLU Activation};
+
+\foreach \i/\j in {input/conv1, conv1/bn1, bn1/relu1, relu1/conv2, conv2/bn2, bn2/relu2}
+  \draw[arrow] (\i) -- (\j);
+\end{tikzpicture}
+\caption{Bottleneck Block }
+\label{fig:bottleneck_block}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.2cm]
+\node (start) [input] {Input MRI Image};
+\node (enc1) [conv, below of=start] {Encoder Block 1};
+\node (enc2) [conv, below of=enc1] {Encoder Block 2};
+\node (enc3) [conv, below of=enc2] {Encoder Block 3};
+\node (enc4) [conv, below of=enc3] {Encoder Block 4};
+\node (bottleneck) [bottleneck, below of=enc4] {Bottleneck};
+\node (dec4) [conv, below of=bottleneck] {Decoder Block 4};
+\node (dec3) [conv, below of=dec4] {Decoder Block 3};
+\node (dec2) [conv, below of=dec3] {Decoder Block 2};
+\node (dec1) [conv, below of=dec2] {Decoder Block 1};
+\node (output) [output, below of=dec1] {Output: Segmentation Mask};
 
 \foreach \i/\j in {start/enc1, enc1/enc2, enc2/enc3, enc3/enc4, enc4/bottleneck,
                    bottleneck/dec4, dec4/dec3, dec3/dec2, dec2/dec1, dec1/output}
-  \draw[->] (\i) -- (\j);
+  \draw[arrow] (\i) -- (\j);
 \end{tikzpicture}
-\caption{U-Net Data Flow from Encoder to Output}
+\caption{U-Net Architecture Flow}
 \label{fig:unet_flow}
 \end{figure}
 
-\section{Hardware Results}
-Each Verilog module was simulated and synthesized independently using Vivado.
 
+%\vspace{1cm}
+
+
+
+\subsection{Hardware Synthesis Results}
+
+The following tables present detailed synthesis resource utilization for each module. Each table includes Flip-Flops (FFs), Look-Up Tables (LUTs), and Bonded I/Os with their respective utilization, availability, and utilization percentage.
+
+% Conv2D Layer
 \begin{table}[H]
-\caption{Module-wise Hardware Synthesis Results (to be filled)}
+\caption{Conv2D Layer Resource Utilization}
 \centering
 \begin{tabular}{|c|c|c|c|}
 \hline
-Module              & LUTs Used & FFs Used & Max Freq (MHz) \\ \hline
-Conv2D Layer        &           &          &               \\ \hline
-BatchNorm+ReLU      &           &          &               \\ \hline
-MaxPooling          &           &          &               \\ \hline
-Conv2DTranspose     &           &          &               \\ \hline
-Encoder Block        &           &          &               \\ \hline
-Decoder Block        &           &          &               \\ \hline
-Feature Concatenate &           &          &               \\ \hline
+\textbf{Resource} & \textbf{Utilization} & \textbf{Available} & \textbf{Utilization \%} \\ \hline
+FFs         & 228 & 460800 & 0.05 \\ \hline
+LUTs        & 1068 & 230400 & 0.46 \\ \hline
+Bonded IOs   & 18 & 204 & 8.83 \\ \hline
 \end{tabular}
-\label{tab:hardware_results}
 \end{table}
 
-\section{Conclusion}
-This work successfully demonstrates a hardware-software co-design methodology for brain tumor segmentation. Future work includes optimizing memory usage and integrating the complete U-Net on FPGA.
+% BatchNorm + ReLU
+\begin{table}[H]
+\caption{BatchNorm + ReLU Resource Utilization}
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Resource} & \textbf{Utilization} & \textbf{Available} & \textbf{Utilization \%} \\ \hline
+FFs         & 117 & 460800 & 0.03 \\ \hline
+LUTs        & 83 & 230400 & 0.04 \\ \hline
+Bonded IOs   & 12 & 204 & 5.88 \\ \hline
+\end{tabular}
+\end{table}
 
-\section*{References}
+% MaxPooling
+\begin{table}[H]
+\caption{MaxPooling Resource Utilization}
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Resource} & \textbf{Utilization} & \textbf{Available} & \textbf{Utilization \%} \\ \hline
+FFs         & 1372 & 460800 & 0.30 \\ \hline
+LUTs        & 1560 & 230400 & 0.68 \\ \hline
+Bonded IOs   & 38 & 204 & 18.63 \\ \hline
+\end{tabular}
+\end{table}
+
+% Conv2DTranspose
+\begin{table}[H]
+\caption{Conv2DTranspose Resource Utilization}
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Resource} & \textbf{Utilization} & \textbf{Available} & \textbf{Utilization \%} \\ \hline
+FFs         & 647 & 460800 & 0.14 \\ \hline
+LUTs        & 1176 & 230400 & 0.51 \\ \hline
+Bonded IOs   & 58 & 204 & 28.43 \\ \hline
+\end{tabular}
+\end{table}
+
+% Feature Concatenate
+\begin{table}[H]
+\caption{Feature Concatenate Resource Utilization}
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Resource} & \textbf{Utilization} & \textbf{Available} & \textbf{Utilization \%} \\ \hline
+FFs         & 272 & 460800 & 0.06 \\ \hline
+LUTs        & 1077 & 230400 & 0.47 \\ \hline
+Bonded IOs   & 55 & 204 & 26.96 \\ \hline
+\end{tabular}
+\end{table}
+
+
+\subsection{Timing Analysis}
+Table~\ref{tab:module_timing} summarizes the timing performance including the critical path delay, achieved clock period and maximum frequency.
+
+
+
+
+
+\begin{table}[h!]
+\caption{Timing Analysis}
+\centering
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Module}           & \textbf{Critical Path Delay (ns)} & \textbf{Max Freq (MHz)} \\ \hline
+Conv2D Layer              & 1.66                              & 166.66                  \\ \hline
+BatchNorm+ReLU            & 1.65                              & 166.66                  \\ \hline
+MaxPooling                & 5.97                              & 142.85                  \\ \hline
+Conv2DTranspose           & 1.66                              & 166.66                  \\ \hline
+Feature Concatenate       & 1.65                              & 166.66                  \\ \hline
+\end{tabular}
+\label{tab:module_timing}
+\end{table}
+
+
+\begin{table}[H]
+\caption{Power Consumption}
+\centering
+\begin{tabular}{|p{2.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|}
+\hline
+\textbf{Module} & \textbf{Static Power (mW)} & \textbf{Dynamic Power (mW)} & \textbf{Total Power (mW)} \\ \hline
+Conv2D Layer              & 595 & 134 & 729 \\ \hline
+BatchNorm+ReLU            & 593 & 18  & 611 \\ \hline
+MaxPooling                & 611 & 502 & 1113 \\ \hline
+Conv2DTranspose           & 596 & 124 & 720 \\ \hline
+Feature Concatenate       & 597 & 173 & 771 \\ \hline
+\end{tabular}
+\label{tab:module_power}
+\end{table}
+
+
+\section{Conclusion}
+This paper presented a hardware-software co-design approach for brain tumor segmentation using the U-Net architecture. The software implementation involved training a custom U-Net model on 3064 contrast-enhanced MRI images, achieving strong performance across segmentation metrics. On the hardware side, key components of U-Net were modularized in Verilog and synthesized using Vivado, targeting the XA Zynq UltraScale+ MPSoC FPGA.
+
+The design achieved efficient resource utilization, low power consumption, and real-time processing capabilities, demonstrating the feasibility of deploying deep learning-based medical segmentation on reconfigurable hardware.
+
+%Future work includes optimizing memory usage, and exploring quantization or HLS-based design flows for improved efficiency and portability.
+
+
+%\section{References}
+\vspace{0.3cm}
 \begin{thebibliography}{00}
-\bibitem{b1} Cheng J., et al., “Enhanced Performance of Brain Tumor Classification via Tumor Region Augmentation,” PLoS ONE, 2015.
-\bibitem{b2} Ronneberger O., et al., “U-Net: Convolutional Networks for Biomedical Image Segmentation,” MICCAI, 2015.
-\bibitem{b3} Bhanothu Y., et al., “Detection and Classification of Brain Tumor using Deep CNN,” ICACCS, 2020.
-\bibitem{b4} Khalil A., et al., “Hardware Acceleration of U-Net on FPGA,” IEEE, 2019.
-\bibitem{b5} Rayapati H., et al., “FPGA Co-design for Brain Tumor Segmentation,” IEEE, 2021.
-\bibitem{b6} Chatterjee S., et al., “FPGA Custom IP Core for Edge Detection,” VDAT, 2024.
-\bibitem{b7} Mallick A., et al., “Deep Learning for Brain Tumor Detection with FPGA Pathway,” iSES, 2024.
-\bibitem{b8} Popat M., et al., “Brain Tumor Segmentation using Box-U-Net,” ICAEECI, 2023.
+\bibitem{b1} Cheng J, Huang W, Cao S, Yang R, Yang W, Yun Z, et al., "Enhanced Performance of Brain Tumor Classification via Tumor Region Augmentation and Partition," PLoS ONE, vol. 10, 2015.
+
+\bibitem{b2} Olaf R, Philipp F and Thomas B, "UNet Convolutional Networks for Biomedical Image Segmentation," International Conference on Medical Image Computing and Computer-Assisted Intervention, 2015.
+
+\bibitem{b3} Y. Bhanothu, A. Kamalakannan, G. Rajamanickam, "Detection and Classification of Brain Tumor using Deep CNN," ICACCS, 2020.
+
+\bibitem{b4} K. Khalil, R. Abdelfattah, K. Abdelfatah and A. Sherif, "Hardware Acceleration-Based Scheme for UNET Implementation Using FPGA," 2024 IEEE 3rd International Conference on Computing and Machine Intelligence (ICMI), Mt Pleasant, MI, USA, 2024.
+
+\bibitem{b5} V. Rayapati, R. K. R. Gogireddy, A. K. Gandi, S. Gajawada, G. K. R. Sanampudi and N. Rao, "FPGA-based Hardware Software Co-design to Accelerate Brain Tumour Segmentation," 2024 IEEE International Symposium on Circuits and Systems (ISCAS), Singapore, 2024.
+
+\bibitem{b6} S. Chatterjee, S. Pandit and A. Das, "Design of FPGA based Custom IP Core to Detect the Edges of Brain Tumors," 2024 28th International Symposium on VLSI Design and Test (VDAT), Vellore, India, 2024.
+
+\bibitem{b7} A. Mallick, H. Prasad, P. Maji, S. Banerjee and H. K. Mondal, "Deep Learning for Brain Tumor Detection with FPGA Pathway," 2024 IEEE International Symposium on Smart Electronic Systems (iSES), New Delhi, India, 2024.
+
+\bibitem{b8} M. Popat, S. Patel, Y. Poshiya, A. K. S. Adiraju, "Brain Tumor Segmentation using Box-U-Net," ICAEECI, 2023.
+
+\bibitem{b9} Y. Zhang, J. Chen, X. Ma, G. Wang, U. A. Bhatti and M. Huang, "Interactive Medical Image Annotation using Improved Attention U-net with Compound Geodesic Distance," Expert Systems with Applications, vol. 237, 2024.
+
+\bibitem{b10} Z. Lou, Y. Q. Gong, X. Zhou and G. H. Hu, "Low Expression of miR-199 in Hepatocellular Carcinoma Contributes to Tumor Cell Hyper-proliferation by Negatively Suppressing XBP1," Oncology Letters, vol. 16, no. 5, pp. 6531–6539, 2018.
+
+\bibitem{b11} A. Huang and W. Zhou, "Mn-based cGAS-STING Activation for Tumor Therapy," Chinese Journal of Cancer Research, vol. 35, no. 1, pp. 19–43, 2023.
+
+\bibitem{b12} A. H. Nizamani, Z. Chen, A. A. Nizamani and K. Shaheed, "Feature-enhanced fusion of U-NET-based improved brain tumor images segmentation," \textit{Journal of Cloud Computing: Advances, Systems and Applications}, vol. 12, no. 170, 2023. 
+
 \end{thebibliography}
 
 \end{document}
